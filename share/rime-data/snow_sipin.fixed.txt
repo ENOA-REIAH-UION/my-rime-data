@@ -1051,7 +1051,7 @@ xn	性能
 nn	男女
 yd	程度
 pk	片刻
-lq	猎奇
+lq	篮球
 ct	餐厅
 rb	日本
 ps	配色

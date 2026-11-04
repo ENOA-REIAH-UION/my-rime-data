@@ -1,11 +1,8 @@
-local snow = require "snow.snow"
 -- 略码处理器
 
-local this = {}
+local snow = require "snow.snow"
 
----@param env Env
-function this.init(env)
-end
+local processor = {}
 
 local lookup = {
   ["D"] = "的",
@@ -17,9 +14,13 @@ local lookup = {
 }
 
 ---@param key_event KeyEvent
----@param env PoppingEnv
-function this.func(key_event, env)
+---@param env Env
+function processor.func(key_event, env)
   local context = env.engine.context
+  local segment = context.composition:toSegmentation():back()
+  if not segment or not segment:has_tag("abc") then
+    return snow.kNoop
+  end
   local selection = context:get_selected_candidate()
   if not selection then
     return snow.kNoop
@@ -32,45 +33,34 @@ function this.func(key_event, env)
     return snow.kNoop
   end
   local incoming = utf8.char(key_event.keycode)
-  if incoming == '[' and length == 1 then -- 重复一字词
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text(selection.text)
+  local text = selection.text
+  -- 重复出来的部分，分别接在这个词的前面和后面
+  local before, after = "", ""
+  if incoming == "[" and length == 1 or incoming == "A" then -- 重复一字词、多字词
+    after = text
   elseif lookup[incoming] ~= nil then -- 重复并插入
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text(lookup[incoming])
-    env.engine:commit_text(selection.text)
-  elseif incoming == 'E' or incoming == 'I' then -- 重复词的首字或末字
-    if incoming == 'E' then
-      env.engine:commit_text(snow.sub(selection.text, 1, 1))
-    end
-    context:confirm_current_selection()
-    context:commit()
-    if incoming == 'I' then
-      env.engine:commit_text(snow.sub(selection.text, -1, -1))
-    end
-  elseif incoming == 'A' then -- 重复多字词
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text(selection.text)
-  elseif incoming == 'O' and length == 2 then -- 叠词重复二字词
-    env.engine:commit_text(snow.sub(selection.text, 1, 1))
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text(snow.sub(selection.text, -1, -1))
-  elseif incoming == 'W' then -- Ａ着Ａ着
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text('着' .. selection.text .. '着')
-  elseif incoming == 'Q' then -- Ａ来Ａ去
-    context:confirm_current_selection()
-    context:commit()
-    env.engine:commit_text('来' .. selection.text .. '去')
+    after = lookup[incoming] .. text
+  elseif incoming == "E" then -- 重复词的首字
+    before = snow.sub(text, 1, 1)
+  elseif incoming == "I" then -- 重复词的末字
+    after = snow.sub(text, -1, -1)
+  elseif incoming == "O" and length == 2 then -- 叠词重复二字词
+    before, after = snow.sub(text, 1, 1), snow.sub(text, -1, -1)
+  elseif incoming == "W" then -- Ａ着Ａ着
+    after = "着" .. text .. "着"
+  elseif incoming == "Q" then -- Ａ来Ａ去
+    after = "来" .. text .. "去"
   else
     return snow.kNoop
   end
+  -- 输入统计把重复出来的部分合起来记作一次上屏，略码键是它的编码，像顶功那样转给它
+  snow.commit_text(env.engine, before, "")
+  snow.handover = 1
+  context:confirm_current_selection()
+  context:commit()
+  snow.handover = nil
+  snow.commit_text(env.engine, after, before .. after)
   return snow.kAccepted
 end
 
-return this
+return processor

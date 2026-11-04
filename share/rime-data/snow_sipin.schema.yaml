@@ -6,7 +6,7 @@ __include: snow_pinyin.schema.yaml:/
 schema:
   schema_id: snow_sipin
   name: 冰雪四拼
-  version: "0.3"
+  version: "0.3.13"
   author:
     - 谭淞宸 <i@tansongchen.com>
   description: |
@@ -18,15 +18,16 @@ schema:
 
 engine:
   processors:
+    - lua_processor@*snow.statistics*processor
     - ascii_composer
-    - recognizer
-    - lua_processor@*snow.user_dict
     - lua_processor@*snow.shape_processor
-    - key_binder
     - lua_processor@*snow.abbreviation
     - lua_processor@*snow.select_character
-    - lua_processor@*snow.editor
     - lua_processor@*snow.popping
+    - recognizer
+    - lua_processor@*snow.user_dict
+    - key_binder
+    - lua_processor@*snow.editor
     - speller
     - punctuator
     - selector
@@ -45,19 +46,25 @@ engine:
     - script_translator
     - table_translator@stroke
     - script_translator@pinyin
+    - lua_translator@*snow.buffered
     - lua_translator@*snow.datetime
+    - lua_translator@*snow.statistics*translator
     - lua_translator@*snow.number
+    - lua_translator@*snow.unicode*translator
     - lua_translator@*snow.calculator
     - history_translator
   filters:
+    - lua_filter@*snow.placeholder
+    - lua_filter@*snow.bihua
     - reverse_lookup_filter@lookup_pinyin
     - reverse_lookup_filter@lookup_sipin
     - lua_filter@*snow.fix
+    - lua_filter@*snow.shape_filter
     - lua_filter@*snow.postpone
     - uniquifier
-    - lua_filter@*snow.shape_filter
     - simplifier
     - lua_filter@*snow.special
+    - lua_filter@*snow.unicode*filter
 
 sipin_algebra:
   # 无理音节
@@ -65,6 +72,7 @@ sipin_algebra:
   - derive/wu3/gu2/ # 五
   - derive/ri4/ri1/ # 日
   # 还原
+  - xform/(^| )r5(?= |$)/$1er5/ # 儿化轻声并入 er5，避免占用单键 r
   - xform/(^| )(h?)([mn]g?\d)/$1$2e$3/
   - xform/(^| )wu?/$1u/
   - xform/(^| )yu/$1ü/
@@ -138,8 +146,8 @@ speller:
     - match: ".*[^a-z0-9]"
       accept: "[bpmfdtnlgkhjqxzcsrywv]"
     # 标点大写顶
-    - match: ".*[a-z0-9;']"
-      accept: "[^a-z0-9;' ]"
+    - match: ".*[a-z0-9]"
+      accept: "[^a-z0-9 ]"
   algebra:
     __include: /sipin_algebra
     __append:
